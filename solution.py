@@ -5,6 +5,7 @@ import struct
 import time
 import select
 import binascii
+from statistics import stdev
 # Should use stdev
 
 ICMP_ECHO_REQUEST = 8
@@ -44,12 +45,19 @@ def receiveOnePing(mySocket, ID, timeout, destAddr):
         if whatReady[0] == []:  # Timeout
             return "Request timed out."
 
-        timeReceived = time.time()
         recPacket, addr = mySocket.recvfrom(1024)
-
+        timeReceived = time.time()
         # Fill in start
-
         # Fetch the ICMP header from the IP packet
+        icmp_header = recPacket[20:28]
+        type, code, checksum, id, sequence = struct.unpack("bbHHh", icmp_header)
+        #print(type, code, checksum, id, sequence)
+        if id == ID:
+            byteSize = struct.calcsize("d")
+            timeSent = struct.unpack("d", recPacket[28:28 + byteSize])[0]
+            rTT = timeReceived - timeSent
+            #print(rTT)
+        return rTT
 
         # Fill in end
         timeLeft = timeLeft - howLongInSelect
@@ -109,16 +117,28 @@ def ping(host, timeout=1):
     
     #Send ping requests to a server separated by approximately one second
     #Add something here to collect the delays of each ping in a list so you can calculate vars after your ping
-    
+
+    delayList = []
     for i in range(0,4): #Four pings will be sent (loop runs for i=0, 1, 2, 3)
         delay = doOnePing(dest, timeout)
         print(delay)
+        delayList.append(delay)
         time.sleep(1)  # one second
+
+    packet_min = float(min(delayList))
+    #print(packet_min)
+    packet_avg = float(sum(delayList))/float(len(delayList))
+    #print(packet_avg)
+    packet_max = float(max(delayList))
+    #print(packet_max)
+    packet_stdev = float(stdev(delayList))
+    #print(packet_stdev)
         
     #You should have the values of delay for each ping here; fill in calculation for packet_min, packet_avg, packet_max, and stdev
-    #vars = [str(round(packet_min, 8)), str(round(packet_avg, 8)), str(round(packet_max, 8)),str(round(stdev(stdev_var), 8))]
+    vars = [str(round(packet_min, 8)), str(round(packet_avg, 8)), str(round(packet_max, 8)),str(round(stdev(delayList), 8))]
 
     return vars
 
 if __name__ == '__main__':
     ping("google.co.il")
+    #ping("127.0.0.1")
